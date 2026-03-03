@@ -82,3 +82,21 @@ def http_exception_handler(request: Request, exc: StarletteHTTPException):
         request, "error.html", {"status_code": exc.status_code, "message": message, "title": f"{exc.status_code} Error"},
         status_code=exc.status_code,
     )
+
+# Custom exception handler for validation errors
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": exc.errors()},
+        )
+    
+    return templates.TemplateResponse(
+        request, "error.html", {
+            "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "message": "Invalid input. Please check your data and try again.",
+            "title": "Validation Error"},
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+    )
+
