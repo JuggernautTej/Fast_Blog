@@ -1,0 +1,64 @@
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+app = FastAPI()
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+templates = Jinja2Templates(directory="templates") # Set the directory for Jinja2 templates and create an instance of Jinja2Templates
+
+posts: list[dict] = [
+    {
+        "id": 1,
+        "author": "Corey Schafer",
+        "title": "FastAPI is Awesome!",
+        "content": "This framework is really easy to use and is super fast.",
+        "date_posted": "April 20, 2025",
+    },
+    {
+        "id": 2,
+        "author": "Jane Doe",
+        "title": "Python is Great for Web Development!",
+        "content": "Python is a great language for web development, and FastAPI makes it even better.",
+        "date_posted": "April 21, 2025"
+    },
+    {
+        "id": 3,
+        "author": "Jide Cardoso",
+        "title": "Writing Code is the best thing to do",
+        "content": "With the advent of AI, writing code has become more efficient and enjoyable.",
+        "date_posted": "March 1, 2026"
+    }
+]
+
+@app.get("/", include_in_schema=False, name="home")
+@app.get("/posts", include_in_schema=False, name="posts")
+def home(request: Request):
+    return templates.TemplateResponse(
+        request, "home.html", {"posts": posts, "title": "TestHome"},
+        )
+
+
+@app.get("/posts/{post_id}", include_in_schema=False)
+def post_page(request: Request, post_id: int):
+    for post in posts:
+        if post["id"] == post_id:
+            return templates.TemplateResponse(
+                request, "post.html", {"post": post, "title": post["title"]},
+        )
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+
+@app.get("/api/posts")
+def get_posts():
+    return posts
+
+@app.get("/api/posts/{post_id}")
+def get_post(post_id: int):
+    for post in posts:
+        if post.get("id") == post_id:
+            return post
+    # post = next((post for post in posts if post.get("id") == post_id), "Post not found") # Alternative way to find the post using a generator expression and the next() function as a pythonic idiom
+    # return post
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
