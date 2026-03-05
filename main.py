@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Request, status
+import models
+from database import Base, engine, get_db
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,10 +9,25 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from schemas import PostCreate, PostResponse
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from typing import Annotated
+
+# First, create the database tables based on the models defined in
+#  models.py. This will create the users and posts tables in the 
+# database if they do not already exist. The Base.metadata.create_all() 
+# function is used to create the tables, and it takes the engine as an 
+# argument to connect to the database. This step is necessary to ensure 
+# that the database schema is set up correctly before we start handling
+#  requests in our FastAPI application.
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 templates = Jinja2Templates(directory="templates") # Set the directory for Jinja2 templates and create an instance of Jinja2Templates
 
