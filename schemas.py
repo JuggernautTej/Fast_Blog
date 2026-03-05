@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+"""This module defines the Pydantic models (schemas) used for data validation and serialization in the FastAPI application."""
+from datetime import datetime, timezone
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class PostBase(BaseModel):
     """Base model for a blog post, containing common fields.
