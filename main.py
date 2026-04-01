@@ -57,20 +57,44 @@ templates = Jinja2Templates(directory="templates") # Set the directory for Jinja
 
 @app.get("/", include_in_schema=False, name="home")
 @app.get("/posts", include_in_schema=False, name="posts")
-def home(request: Request):
+def home(request: Request, db:Annotated[Session, Depends(get_db)]):
+    """This method retrieves all posts from the database  and passes
+     them as a template response for rendering the homepage"""
+    result = db.execute(select(models.Post))
+    posts = result.scalars().all()
     return templates.TemplateResponse(
-        request, "home.html", {"posts": posts, "title": "TestHome"},
+        request, "home.html", {"posts": posts, "title": "Home"},
         )
 
 
 @app.get("/posts/{post_id}", include_in_schema=False)
-def post_page(request: Request, post_id: int):
-    for post in posts:
-        if post["id"] == post_id:
+def post_page(request: Request, post_id: int, db: Annotated[Session, Depends(get_db)]):
+    """This method defines the html route for retrieving a post"""
+    result = db.execute(select(models.Post) .where(models.Post.id == post_id))
+    post = result.scalars().first()
+    if post:
+            title = post.title[:50]
             return templates.TemplateResponse(
-                request, "post.html", {"post": post, "title": post["title"]},
+                request, "post.html", {"post": post, "title": title},
         )
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+# html version of viewing a user's post
+@app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
+def user_posts_page(request: Request, user_id: int, db: Annotated[Session, Depends(get_db)],):
+    """ """
+    result = db.execute(select(models.User).where(models.User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    result = db.execute(select(models.Post).where(models.Post.user_id == user_id))
+    posts = result.scalars().all()
+    return  templates.TemplateResponse(
+        request, "user_posts.html", {"posts": posts, "user": user, "title": f"{user.username}'s Posts"},
+    )
 
 
 @app.post("/api/users", response_model=UserResponse,
@@ -105,34 +129,61 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     return new_user
 
 @app.get("/api/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int):
-    pass
+def get_user(user_id: int,  db: Annotated[Session, Depends(get_db)]):
+    """Defines retriving a user by the user id"""
+    result = db.execute(select(models.User).where(models.User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
+
+@app.get("/api/users/{user_id}/posts", response_model=list[PostResponse])
+def get_user_posts(
+    user_id: int, db: Annotated[Session, Depends(get_db)]):
+    """Defines function to get all posts associated with one user"""
+    # Check if user exists first
+    result = db.execute(select(models.User).where(models.User.id == user_id))
+    user = result.scalar_one_or_none
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    result = db.execute(select(models.Post).where(models.Post.user_id == user_id))
+    posts = result.scalars().all()
+    return posts
+
 
 @app.get("/api/posts", response_model=list[PostResponse])
-def get_posts():
+def get_posts(db: Annotated[Session, Depends(get_db)]):
+    """Retrieves all post from the database for the api """
+    result = db.execute(select(models.Post))
+    posts = result.scalars().all()
     return posts
 
 @app.post("/api/posts", response_model=PostResponse,
           status_code=status.HTTP_201_CREATED)
-def create_post(post: PostCreate):
-    new_id = max(p["id"] for p in posts) + 1 if posts else 1
-    new_post = {
-        "id" : new_id,
-        "author": post.author,
-        "title": post.title,
-        "content": post.content,
-        "date_posted": "March 3, 2026"
-    }
-    posts.append(new_post)
+def create_post(post: PostCreate, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.User).where(models.User.id == post.user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    new_post = models.Post(
+        title=post.title,
+        content=post.content,
+        user_id=post.user_id,
+    )
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
     return new_post
 
 @app.get("/api/posts/{post_id}", response_model=PostResponse)
-def get_post(post_id: int):
-    for post in posts:
-        if post.get("id") == post_id:
-            return post
-    # post = next((post for post in posts if post.get("id") == post_id), "Post not found") # Alternative way to find the post using a generator expression and the next() function as a pythonic idiom
-    # return post
+def get_post(post_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.Post).where(models.Post.id == post_id))
+    post = result.scalars().first()
+    if post:
+        return post
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
 # Custom exception handler for HTTP exceptions
