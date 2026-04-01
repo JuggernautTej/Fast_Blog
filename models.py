@@ -17,7 +17,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
     # password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
-    image_file: Mapped[str | None] = mapped_column(String(200), nullable=False, default=None)
+    image_file: Mapped[str | None] = mapped_column(String(200), nullable=True, default=None)
     posts: Mapped[list[Post]] = relationship(back_populates="author") 
     # future reference to Post
     

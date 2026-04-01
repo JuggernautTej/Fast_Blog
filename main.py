@@ -152,7 +152,7 @@ def get_user_posts(
 
 
 @app.get("/api/posts", response_model=list[PostResponse])
-def get_posts(db: Annotated[Session, Depends(get_db)]):
+def get_all_posts(db: Annotated[Session, Depends(get_db)]):
     """Retrieves all post from the database for the api """
     result = db.execute(select(models.Post))
     posts = result.scalars().all()
