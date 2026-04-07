@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     """
     username: str = Field(min_length=1, max_length=50, description="The username of the user")
     email: EmailStr = Field(max_length=120, description="The email address of the user")
+    # todo: update email entry to ensure that it is an email entry (with the "@" a mandatory entry)
 
 class UserCreate(UserBase):
     """Model for creating a new user.
@@ -47,6 +48,12 @@ class PostCreate(PostBase):
     user_id: int = Field(
         description="The unique identifier of the user creating the post") 
     # This is a temporary field for testing purposes, as we will implement user authentication and authorization in the next iteration of the code, where we will get the user_id from the authenticated user instead of passing it in the request body.
+
+class PostUpdate(BaseModel):
+    """Model for updating an existing blog post.
+    """
+    title: str | None = Field(default=None, min_length=1, max_length=100, description="The title of the blog post")
+    content: str | None = Field(default=None, min_length=1, description="The content of the blog post")
 
 class PostResponse(PostBase):
     """This model is used for responses when retrieving blog posts, ensuring that all fields are included in the response.

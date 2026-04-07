@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from schemas import PostCreate, PostResponse,UserCreate, UserResponse
+from schemas import PostCreate, PostResponse, PostUpdate, UserCreate, UserResponse
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -185,6 +185,89 @@ def get_post(post_id: int, db: Annotated[Session, Depends(get_db)]):
     if post:
         return post
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+@app.put("/api/posts/{post_id}", response_model=PostResponse)
+def update_post_full(
+    post_id: int, post_data: PostCreate, db: Annotated[Session, Depends(get_db)]
+    ):
+    """This method defines the function to update a post by its id, and 
+    it expects the full post data in the request body. It first checks
+    if the post exists, and if not, it raises a 404 Not Found error.
+    Then it checks if the user_id in the post_data matches the user_id 
+    of the existing post. If they do not match, it checks if the user 
+    with the user_id in post_data exists. If the user does not exist, it 
+    raises a 404 Not Found error. Finally, it updates the post's title, 
+    content, and user_id with the new data from post_data, commits the 
+    changes to the database, refreshes the post object to get any 
+    updated fields, and returns the updated post.
+    """
+    result = db.execute(select(models.Post).where(models.Post.id == post_id))
+    post = result.scalars().first()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    # Check if the user_id in post_data matches the user_id of the existing post. Will create authentication and authorization logic in the next iteration of the code to ensure that only the author of the post can update it, but for now, we will just check if the user_id in post_data exists in the database before allowing the update to proceed.
+    if post_data.user_id != post.user_id:
+        result = db.execute(select(models.User).where(models.User.id == post.user_id))
+        user = result.scalars().first()
+        if not user:
+            raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    post.title = post_data.title
+    post.content = post_data.content
+    post.user_id = post_data.user_id
+    db.commit()
+    db.refresh(post)
+    return post
+
+@app.patch("/api/posts/{post_id}", response_model=PostResponse)
+def update_post_partial(
+    post_id: int, post_data: PostUpdate, db: Annotated[Session, Depends(get_db)]
+    ):
+    """ This method defines the function to update a post by its id, and
+    it expects partial post data in the request body. It first checks if
+    the post exists, and if not, it raises a 404 Not Found error. Then 
+    it uses the model_dump() method of the Pydantic model to create a 
+    dictionary of the fields that were explicitly set in the request 
+    body, excluding any fields that were not included. It then iterates
+    over the update_data dictionary and uses setattr() to update the 
+    corresponding attributes of the post object with the new values. 
+    Finally, it commits the changes to the database, refreshes the post
+    object to get any updated fields, and returns the updated post.
+    """
+    result = db.execute(select(models.Post).where(models.Post.id == post_id))
+    post = result.scalars().first()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    update_data = post_data.model_dump(exclude_unset=True)
+    # exclude_unset=True tells Pydantic to only include fields that were explicitly set in the request, and to exclude any fields that were not included in the request. This allows for partial updates, where only the fields that need to be updated are included in the request body, and any fields that are not included will remain unchanged in the database.
+
+    for key, value in update_data.items():
+        setattr(post, key, value)
+
+    db.commit()
+    db.refresh(post)
+    return post
+
+@app.delete("/api/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: int, db: Annotated[Session, Depends(get_db)]):
+    """This method defines the function to delete a post by its id. It first checks if the post exists, and if not, it raises a 404 Not Found error. If the post exists, it deletes the post from the database and commits the transaction. Since the status code for this endpoint is 204 No Content, we do not return any content in the response after successfully deleting the post."""
+    result = db.execute(select(models.Post).where(models.Post.id == post_id))
+    post = result.scalars().first()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    db.delete(post)
+    db.commit()
+    # To do: add authentication and authorization logic to ensure that
+    #  only the author of the post can delete it, but for now, we will 
+    # just check if the post exists before allowing the delete to 
+    # proceed. If the post does not exist, we raise a 404 Not Found 
+    # error. If the post exists, we delete it from the database and 
+    # commit the transaction. Since the status code for this endpoint is 
+    # 204 No Content, we do not return any content in the response after
+    # successfully deleting the post.
 
 # Custom exception handler for HTTP exceptions
 @app.exception_handler(StarletteHTTPException)
